@@ -101,14 +101,11 @@ export class CommandRegistry {
     if (args.length < 2) throw new CliError("create expects <type> <id> [params...]");
     const type = args[0]!;
     const id = args[1]!;
-    const inIndex = args.indexOf("in", 2);
-    if (inIndex >= 0 && (inIndex !== args.length - 2 || args[inIndex + 1] === undefined)) {
-      throw new CliError("create 'in' clause must be last");
-    }
+    const inIndex = args.length >= 2 && args[args.length - 2] === "in" ? args.length - 2 : -1;
     const parentId = inIndex < 0 ? undefined : args[inIndex + 1];
     const parameters = args.slice(2, inIndex < 0 ? args.length : inIndex);
     const shape = this.factory.createFromParameters(type, id, parameters);
-    const parent = parentId === undefined ? null : this.requireGroup(document, parentId);
+    const parent = parentId === undefined ? null : this.requireGroup(document, parentId, true);
     context.invoker.executeEditing(new CreateCommand(document, shape, parent));
     return [parent === null ? `${shape.describe()} created` : `${shape.describe()} created in ${parent.describe()}`];
   }
@@ -201,18 +198,23 @@ export class CommandRegistry {
 
   private async undo(args: readonly string[], context: CliContext): Promise<readonly string[]> {
     this.expectCount(args, 0, 0);
+    context.requireDocument();
     context.invoker.undo();
     return ["undone"];
   }
 
   private async redo(args: readonly string[], context: CliContext): Promise<readonly string[]> {
     this.expectCount(args, 0, 0);
+    context.requireDocument();
     context.invoker.redo();
     return ["redone"];
   }
 
-  private requireGroup(document: SvgDocument, id: string): GroupShape {
-    const shape = document.getShape(id);
+  private requireGroup(document: SvgDocument, id: string, missingIsContainer = false): GroupShape {
+    const shape = document.findShape(id);
+    if (shape === undefined) {
+      throw new CliError(missingIsContainer ? `no such container: ${id}` : `no such shape: ${id}`);
+    }
     if (!(shape instanceof GroupShape)) throw new CliError(`not a container: ${id}`);
     return shape;
   }

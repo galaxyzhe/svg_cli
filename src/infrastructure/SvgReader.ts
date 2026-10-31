@@ -40,12 +40,7 @@ export class SvgReader {
     } catch (error) {
       throw new SvgIoError(`cannot read file: ${filePath}`, error);
     }
-    try {
-      return this.read(xml);
-    } catch (error) {
-      if (error instanceof SvgIoError) throw error;
-      throw new SvgIoError(`cannot read file: ${filePath}`, error);
-    }
+    return this.read(xml);
   }
 
   public read(xml: string): SvgDocument {

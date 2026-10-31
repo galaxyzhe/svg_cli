@@ -109,9 +109,22 @@ SvgDocument o-- Shape
 阶段五实现了 `src/cli` 的词法解析、命令注册、会话和 REPL。`CommandLineParser` 支持双引号、空格、反斜杠转义、空行和注释；`CommandRegistry` 是唯一的命令名到处理器分派点，编辑处理器只构造 Command 并交给 `CommandInvoker`。
 典型会话回放确认了启动提示、`svg>` 提示符、create in、group、move/undo/redo、set、tree、save、IO 后 undo 限制和 quit；输出摘要与实验示例的差异仅为措辞，例如 move 使用 `moved by`，不改变命令语义。
 
+## 阶段六验收矩阵
+
+| 类别 | 验收内容 | 代码/测试证据 | 状态 |
+|---|---|---|---|
+| A | init/read/save/canvas、路径、warning、历史限制 | `CommandRegistry`、`SvgReader`、`SvgWriter`、`acceptance.test.ts` | 通过 |
+| B | 六种 create、可选样式、id、create in、set、text | `ShapeFactory`、具体 Shape、`acceptance.test.ts`、`cli.test.ts` | 通过 |
+| C | group/addto/ungroup、z-order、delete、Composite、环校验 | Command 类、`GroupShape`、`application.test.ts` | 通过 |
+| D | undo 单元、redo 清空、显示命令、失败命令、文档锁定 | `CommandInvoker`、`UndoManager`、`application.test.ts` | 通过 |
+| E | 错误表中的 id、容器、类型、scale、文件和无文档错误 | `CommandRegistry`、`CliSession`、`acceptance.test.ts` | 通过 |
+| F | XML、命名空间、尺寸、viewBox、转义、顺序、round-trip | `SvgReader`、`SvgWriter`、`infrastructure.test.ts` | 通过 |
+
+复合图形 ungroup 场景按阶段边界不可达：本阶段没有 `box`，叶子执行 ungroup 会报告 `not a container`。已知限制是典型 transcript 的 move/undo/redo 使用通用摘要，不生成每种图形的详细坐标回显；不支持的 SVG 标签由 `ShapeFactory` 明确拒绝，不做降级。
+
 ## 一致性自查
 
-实际实现目录与方案一致：领域代码位于 `src/domain`，应用层代码位于 `src/application`，基础设施代码位于 `src/infrastructure`，测试位于 `tests`；本阶段仍未实现 CLI 解析。
+实际实现目录与方案一致：领域代码位于 `src/domain`，应用层代码位于 `src/application`，基础设施代码位于 `src/infrastructure`，CLI 位于 `src/cli`，测试位于 `tests`。
 实际实现目录现包含 `src/infrastructure` 的 SVG Reader/Writer 和文件错误适配，以及 `src/cli` 的 Parser、Registry、Context、Formatter、Session 和 Repl；Reader 依赖 XML 库，领域模型不依赖 XML 库或具体文件系统。应用层只依赖领域模型，不依赖 CLI 或文件系统。
 `ShapeFactory` 和 `CommandRegistry` 分别承担实验允许的两个按名字分派点；没有实现 `box`。
 
@@ -128,3 +141,5 @@ SvgDocument o-- Shape
 阶段三追加应用层测试，覆盖十条命令、undo/redo、结构恢复、历史锁定、显示命令跳过历史和失败命令状态不变。
 阶段四追加 infrastructure 测试，覆盖实验样例、自动 id、重复 id、嵌套顺序、中文与 XML 转义、round-trip、未知类型、不支持标签和文件错误。
 阶段五追加 CLI 会话测试和真实管道回放，覆盖引号文本、注释、空行、完整编辑流程、错误前缀、失败状态不变、tree/show/help、退出命令和文档类操作。
+
+阶段六先以验收矩阵和基线测试开始，新增 6 项验收测试。发现并修复了四类边界问题：`create in` 原先把缺失容器报告为 no such shape，修正为 no such container；`readFile` 原先把重复 id 等解析错误包装成 cannot read file，改为保留具体领域错误；Tokenizer 原先丢弃 Windows 路径中未知反斜杠，改为只解析定义的转义；文本内容为 `in` 原先被误判为尾缀子句，改为只识别倒数第二个 token 的 `in`。同时让无文档 undo/redo 遵守统一 no-document 错误。

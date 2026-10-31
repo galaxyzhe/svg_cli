@@ -34,10 +34,16 @@ describe("CLI session", () => {
     expect(await run(session, "tree")).toEqual(["error: no document. use 'init' or 'read' first"]);
     expect(await run(session, "init")).toEqual(["canvas 800x600 created"]);
     expect(await run(session, "create box bad 0 0 1 1 title")).toEqual(["error: unknown shape type: box"]);
+    expect(await run(session, "create rect child 0 0 1 1 in missing")).toEqual(["error: no such container: missing"]);
     expect(await run(session, "tree")).toEqual(["svg (800x600)"]);
     expect(await run(session, "create rect r 0 0 1 1")).toEqual(["rect#r created"]);
     expect(await run(session, "move r nope 1")).toEqual(["error: invalid dx: nope"]);
     expect(await run(session, "show r")).toContain("rect#r  parent=svg\n  x=0\n  y=0\n  width=1\n  height=1");
+  });
+
+  it("reports duplicate ids from read as a document error", async () => {
+    const session = new CliSession();
+    expect(await run(session, "read tests/fixtures/duplicate.svg")).toEqual(["error: id already exists: same"]);
   });
 
   it("supports create in, addto, z-order, canvas and help", async () => {
