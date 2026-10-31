@@ -14,7 +14,7 @@
 - `src/infrastructure`：SVG 读写和文件系统适配。
 - `tests`：领域单元测试、应用层测试和 CLI 集成测试。
 
-当前阶段只建立目录与入口骨架，尚未实现上述领域或命令功能。
+当前阶段已实现 `src/domain` 的领域模型和单元测试；CLI、Command、SVG 文件读写适配器及插件仍未实现。
 
 ### 组件关系
 
@@ -26,6 +26,38 @@
 [cli] --> [infrastructure]
 @enduml
 ```
+
+领域类关系如下：
+
+```plantuml
+@startuml
+abstract class Shape
+class RectShape
+class CircleShape
+class EllipseShape
+class LineShape
+class TextShape
+class GroupShape
+class SvgDocument
+
+Shape <|-- RectShape
+Shape <|-- CircleShape
+Shape <|-- EllipseShape
+Shape <|-- LineShape
+Shape <|-- TextShape
+Shape <|-- GroupShape
+GroupShape o-- Shape
+SvgDocument o-- Shape
+@enduml
+```
+
+领域层关键不变量：
+
+- `SvgDocument` 的 id 索引与根级树递归节点保持一一对应，id 全局唯一且大小写敏感。
+- 一个 `Shape` 至多拥有一个父级；容器不能收纳自身或自己的后代。
+- `GroupShape` 的子项使用有序数组保存，移动父级时先完成合法性校验，再更新父子关系。
+- `move` 和 `scale` 由 `Shape` 多态实现；容器只递归调用每个直接子项一次，避免重复变换。
+- 几何属性只能由具体图形类处理，公共属性仅限 `fill`、`stroke`、`stroke-width`；文本内容使用独立的 `text` 属性。
 
 ### 设计模式
 
@@ -52,11 +84,15 @@
 
 ## 过程记录
 
-本节只记录实际发生的讨论、实现和修正；当前阶段暂不伪造过程记录。
+阶段二先依据实验原文确认了六种内置图形、左上角坐标系、全局 id、Composite 递归操作和 `set` 白名单。
+实现中先完成 `Shape` 抽象、五种叶子图形、`GroupShape` 和 `SvgDocument`，再用单元测试验证几何变换与树结构。
+测试首次发现未知属性会先被当作数字解析，修正为先进行属性白名单判断，再解析几何值；随后补充了多态 SVG 序列化和 XML 转义测试。
 
 ## 一致性自查
 
-本节在实现完成后，对照架构方案检查实际目录和依赖方向，并记录差异。
+实际实现目录与方案一致：领域代码位于 `src/domain`，测试位于 `tests`；本阶段未提前实现 CLI、应用层命令或基础设施读写。
+领域类只依赖领域内部类型和错误类型，没有依赖 CLI、应用层或文件系统。当前 `GroupShape` 可独立构造，文档通过 `SvgDocument` 入口维护全局索引和归属。
+命令分发和 `ShapeFactory` 尚未实现，因此本阶段没有新增按名字分派点，也没有实现 `box`。
 
 ## 质量保证手段
 
@@ -66,3 +102,5 @@
 - 针对领域对象、命令执行/撤销、读写适配器的单元测试。
 - 针对 CLI 输入输出、错误状态不变和 undo/redo 的集成测试。
 - 典型会话及异常场景的 CLI 验收。
+
+本阶段实际完成：领域单元测试覆盖六类图形、move/scale、嵌套容器、唯一 id、父子环、顺序、属性白名单、浮点值和 SVG 序列化；通过 TypeScript 严格类型检查和生产构建验证。
