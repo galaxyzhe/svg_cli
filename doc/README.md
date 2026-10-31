@@ -106,11 +106,14 @@ SvgDocument o-- Shape
 阶段四选择 `fast-xml-parser` 作为 XML 库。它支持 XML 实体、属性、文本节点和保序嵌套解析，避免手工字符串切割；Reader 只负责 XML 到领域对象的适配，Writer 只负责文档封装，图形序列化仍由 `Shape.toSvg()` 多态完成。
 不支持的 SVG 标签采用由 `ShapeFactory` 明确拒绝并抛出 unknown shape type 的策略；未知图形类型（包括 `box`）不降级。
 
+阶段五实现了 `src/cli` 的词法解析、命令注册、会话和 REPL。`CommandLineParser` 支持双引号、空格、反斜杠转义、空行和注释；`CommandRegistry` 是唯一的命令名到处理器分派点，编辑处理器只构造 Command 并交给 `CommandInvoker`。
+典型会话回放确认了启动提示、`svg>` 提示符、create in、group、move/undo/redo、set、tree、save、IO 后 undo 限制和 quit；输出摘要与实验示例的差异仅为措辞，例如 move 使用 `moved by`，不改变命令语义。
+
 ## 一致性自查
 
 实际实现目录与方案一致：领域代码位于 `src/domain`，应用层代码位于 `src/application`，基础设施代码位于 `src/infrastructure`，测试位于 `tests`；本阶段仍未实现 CLI 解析。
-实际实现目录现包含 `src/infrastructure` 的 SVG Reader/Writer 和文件错误适配；Reader 依赖 XML 库，领域模型不依赖 XML 库或具体文件系统。应用层只依赖领域模型，不依赖 CLI 或文件系统。
-`ShapeFactory` 是本阶段唯一新增的类型名分派点；命令分发点尚未实现。没有实现 `box`。
+实际实现目录现包含 `src/infrastructure` 的 SVG Reader/Writer 和文件错误适配，以及 `src/cli` 的 Parser、Registry、Context、Formatter、Session 和 Repl；Reader 依赖 XML 库，领域模型不依赖 XML 库或具体文件系统。应用层只依赖领域模型，不依赖 CLI 或文件系统。
+`ShapeFactory` 和 `CommandRegistry` 分别承担实验允许的两个按名字分派点；没有实现 `box`。
 
 ## 质量保证手段
 
@@ -124,3 +127,4 @@ SvgDocument o-- Shape
 本阶段实际完成：领域单元测试覆盖六类图形、move/scale、嵌套容器、唯一 id、父子环、顺序、属性白名单、浮点值和 SVG 序列化；通过 TypeScript 严格类型检查和生产构建验证。
 阶段三追加应用层测试，覆盖十条命令、undo/redo、结构恢复、历史锁定、显示命令跳过历史和失败命令状态不变。
 阶段四追加 infrastructure 测试，覆盖实验样例、自动 id、重复 id、嵌套顺序、中文与 XML 转义、round-trip、未知类型、不支持标签和文件错误。
+阶段五追加 CLI 会话测试和真实管道回放，覆盖引号文本、注释、空行、完整编辑流程、错误前缀、失败状态不变、tree/show/help、退出命令和文档类操作。

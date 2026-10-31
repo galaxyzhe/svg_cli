@@ -10,6 +10,28 @@ import { TextShape } from "./TextShape.js";
 export type ShapeFactoryAttributes = Readonly<Record<string, string>>;
 
 export class ShapeFactory {
+  public createFromParameters(type: string, id: string, parameters: readonly string[]): Shape {
+    switch (type) {
+      case "rect":
+        return this.create(type, id, this.attributes(parameters, ["x", "y", "width", "height"], "fill"));
+      case "circle":
+        return this.create(type, id, this.attributes(parameters, ["cx", "cy", "r"], "fill"));
+      case "ellipse":
+        return this.create(type, id, this.attributes(parameters, ["cx", "cy", "rx", "ry"], "fill"));
+      case "line":
+        return this.create(type, id, this.attributes(parameters, ["x1", "y1", "x2", "y2"], "stroke"));
+      case "text": {
+        if (parameters.length !== 3) throw new DomainError("invalid create parameters for text");
+        return this.create(type, id, { x: parameters[0]!, y: parameters[1]! }, parameters[2]);
+      }
+      case "g":
+        if (parameters.length !== 0) throw new DomainError("invalid create parameters for g");
+        return this.create(type, id);
+      default:
+        throw new DomainError(`unknown shape type: ${type}`);
+    }
+  }
+
   public create(type: string, id: string, attributes: ShapeFactoryAttributes = {}, text = ""): Shape {
     let shape: Shape;
     switch (type) {
@@ -51,5 +73,20 @@ export class ShapeFactory {
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) throw new DomainError(`invalid shape attribute: ${name}`);
     return parsed;
+  }
+
+  private attributes(parameters: readonly string[], required: readonly string[], optional: string): Record<string, string> {
+    if (parameters.length !== required.length && parameters.length !== required.length + 1) {
+      throw new DomainError("invalid create parameters");
+    }
+    const attributes: Record<string, string> = {};
+    required.forEach((name, index) => {
+      const value = parameters[index];
+      if (value === undefined) throw new DomainError(`missing create parameter: ${name}`);
+      attributes[name] = value;
+    });
+    const optionalValue = parameters[required.length];
+    if (optionalValue !== undefined) attributes[optional] = optionalValue;
+    return attributes;
   }
 }
