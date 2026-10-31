@@ -1,6 +1,6 @@
 # SVG 编辑器（CLI）
 
-本文档随实现迭代维护。实验原文位于 [`phase_cli_1.md`](../phase_cli_1.md)。
+本文档随实现迭代维护。实验原文位于 [`phase_cli_1.md`](../phase_cli_1.md)。仓库地址 https://github.com/galaxyzhe/svg_cli.git。
 
 ## 架构方案
 
@@ -26,6 +26,8 @@
 [infrastructure] --> [domain]
 @enduml
 ```
+
+![架构图](architecture.svg)
 
 图中的 `cli -> domain` 是当前真实依赖：`CommandRegistry` 需要直接创建 `GroupShape`、调用 `ShapeFactory` 并读取 `SvgDocument`；这不是理想化的间接依赖，已在依赖规则中明确记录。
 
@@ -139,7 +141,7 @@ CLI 解析器不修改领域对象，`CommandRegistry` 负责构造 Command 并�
 典型会话回放确认了启动提示、`svg>` 提示符、create in、group、move/undo/redo、set、tree、save、IO 后 undo 限制和 quit；输出摘要与实验示例的差异仅为措辞，例如 move 使用 `moved by`，不改变命令语义。
 对应提交为 `3946772 feat: implement SVG editor CLI`；随后 `b3e5920 fix: include container id in group cycle errors` 对齐了错误表中的容器 id。
 
-## 阶段六验收矩阵
+**阶段六验收矩阵**
 
 | 类别 | 验收内容 | 代码/测试证据 | 状态 |
 |---|---|---|---|
