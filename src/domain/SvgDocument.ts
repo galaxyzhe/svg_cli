@@ -2,13 +2,25 @@ import { DomainError } from "./DomainError.js";
 import { GroupShape } from "./GroupShape.js";
 import { Shape } from "./Shape.js";
 
+export interface SvgViewBox {
+  readonly minX: number;
+  readonly minY: number;
+  readonly width: number;
+  readonly height: number;
+}
+
 export class SvgDocument {
   private readonly rootShapes: Shape[] = [];
   private readonly shapesById = new Map<string, Shape>();
 
-  public constructor(public width = 800, public height = 600) {
+  public constructor(
+    public width = 800,
+    public height = 600,
+    public viewBox: SvgViewBox = { minX: 0, minY: 0, width, height },
+  ) {
     this.validateCanvasDimension(width, "width");
     this.validateCanvasDimension(height, "height");
+    this.validateViewBox(viewBox);
   }
 
   public get roots(): readonly Shape[] {
@@ -147,6 +159,12 @@ export class SvgDocument {
     this.validateCanvasDimension(height, "height");
     this.width = width;
     this.height = height;
+    this.viewBox = { minX: this.viewBox.minX, minY: this.viewBox.minY, width, height };
+  }
+
+  public setViewBox(viewBox: SvgViewBox): void {
+    this.validateViewBox(viewBox);
+    this.viewBox = { ...viewBox };
   }
 
   private collectNodes(shape: Shape): Shape[] {
@@ -159,5 +177,16 @@ export class SvgDocument {
     if (!Number.isFinite(value) || value < 0) {
       throw new DomainError(`${name} must be a non-negative finite number`);
     }
+  }
+
+  private validateViewBox(viewBox: SvgViewBox): void {
+    this.validateFinite(viewBox.minX, "viewBox minX");
+    this.validateFinite(viewBox.minY, "viewBox minY");
+    this.validateCanvasDimension(viewBox.width, "viewBox width");
+    this.validateCanvasDimension(viewBox.height, "viewBox height");
+  }
+
+  private validateFinite(value: number, name: string): void {
+    if (!Number.isFinite(value)) throw new DomainError(`${name} must be finite`);
   }
 }
