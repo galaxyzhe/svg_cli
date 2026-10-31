@@ -25,7 +25,7 @@ describe("CLI session", () => {
     expect(await run(session, "redo")).toEqual(["redone"]);
     expect(await run(session, 'set label text "新 文本"')).toEqual(["text#label updated: text=新 文本"]);
     expect(await run(session, "group bad flowchart start")).toEqual([
-      "error: cannot group a container into its own descendant",
+      "error: cannot group a container into its own descendant: flowchart",
     ]);
   });
 

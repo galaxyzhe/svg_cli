@@ -62,9 +62,13 @@ export class GroupCommand extends AbstractCommand {
       for (let right = left + 1; right < placements.length; right += 1) {
         const leftTarget = placements[left];
         const rightTarget = placements[right];
-        if (leftTarget !== undefined && rightTarget !== undefined &&
-          (leftTarget.shape.contains(rightTarget.shape) || rightTarget.shape.contains(leftTarget.shape))) {
-          throw new DomainError("cannot group a container into its own descendant");
+        if (leftTarget !== undefined && rightTarget !== undefined) {
+          if (leftTarget.shape.contains(rightTarget.shape)) {
+            throw new DomainError(`cannot group a container into its own descendant: ${leftTarget.shape.id}`);
+          }
+          if (rightTarget.shape.contains(leftTarget.shape)) {
+            throw new DomainError(`cannot group a container into its own descendant: ${rightTarget.shape.id}`);
+          }
         }
       }
     }
