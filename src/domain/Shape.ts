@@ -1,5 +1,6 @@
 import { DomainError } from "./DomainError.js";
 import type { GroupShape } from "./GroupShape.js";
+import { documentTreeToken, ShapeTreeToken } from "./ShapeTreeToken.js";
 
 export type ShapeAttributeValue = number | string;
 
@@ -52,7 +53,8 @@ export abstract class Shape {
     return `${this.type}#${this.id}`;
   }
 
-  public assignParent(parent: GroupShape | null): void {
+  public assignParent(parent: GroupShape | null, token: ShapeTreeToken): void {
+    if (token !== documentTreeToken) throw new DomainError("invalid shape tree token");
     this.parentShape = parent;
   }
 

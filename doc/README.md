@@ -10,7 +10,7 @@
 
 - `src/cli`：REPL、命令解析、命令注册/分发、输出格式化。
 - `src/application`：Command 接口、Invoker、UndoManager、命令实现和应用上下文。
-- `src/domain`：`SvgDocument`、统一 `Shape` 抽象、叶子图形、`g` 容器和 `ShapeFactory`。
+- `src/domain`：`SvgDocument`、统一 `Shape` 抽象、叶子图形、`g` 容器、`ShapeFactory` 和受控树操作令牌。
 - `src/infrastructure`：SVG 读写和文件系统适配。
 - `tests`：领域单元测试、应用层测试、infrastructure 测试、CLI 集成测试和阶段验收测试。
 
@@ -58,6 +58,8 @@ SvgDocument o-- Shape
 - `SvgDocument` 的 id 索引与根级树递归节点保持一一对应，id 全局唯一且大小写敏感。
 - 一个 `Shape` 至多拥有一个父级；容器不能收纳自身或自己的后代。
 - `GroupShape` 的子项使用有序数组保存，移动父级时先完成合法性校验，再更新父子关系。
+- 图形挂载到 `SvgDocument` 后，GroupShape 结构变更必须通过文档操作；`ShapeTreeToken` 只供文档内部受控更新父子关系。
+- 画布尺寸和 viewBox 通过 getter 暴露，修改必须经过 `SvgDocument` 的校验方法。
 - `move` 和 `scale` 由 `Shape` 多态实现；容器只递归调用每个直接子项一次，避免重复变换。
 - 几何属性只能由具体图形类处理，公共属性仅限 `fill`、`stroke`、`stroke-width`；文本内容使用独立的 `text` 属性。
 
@@ -153,7 +155,7 @@ CLI 解析器不修改领域对象，`CommandRegistry` 负责构造 Command 并�
 ## 一致性自查
 
 实际实现目录与方案一致：领域代码位于 `src/domain`，应用层代码位于 `src/application`，基础设施代码位于 `src/infrastructure`，CLI 位于 `src/cli`，测试位于 `tests`。
-实际实现目录现包含 `src/infrastructure` 的 SVG Reader/Writer 和文件错误适配，以及 `src/cli` 的 Parser、Registry、Context、Formatter、Session 和 Repl；Reader 依赖 XML 库，领域模型不依赖 XML 库或具体文件系统。应用层只依赖领域模型，不依赖 CLI 或文件系统。
+实际实现目录现包含 `src/infrastructure` 的 SVG Reader/Writer 和文件错误适配，以及 `src/cli` 的 Parser、Registry、Context、Formatter、Session 和 Repl；domain 还包含 `ShapeTreeToken` 用于保护已挂载树。Reader 依赖 XML 库，领域模型不依赖 XML 库或具体文件系统。应用层只依赖领域模型，不依赖 CLI 或文件系统。
 `ShapeFactory` 和 `CommandRegistry` 分别承担实验允许的两个按名字分派点；没有实现 `box`。
 检查方法：阅读各模块 import、对照组件图并执行 TypeScript 编译；当前未发现违反上述依赖方向的 import。CLI 直接依赖 domain 是已知且记录在方案中的现状，不列为违规项。
 
@@ -166,11 +168,13 @@ CLI 解析器不修改领域对象，`CommandRegistry` 负责构造 Command 并�
 - 针对 CLI 输入输出、错误状态不变和 undo/redo 的集成测试。
 - 典型会话及异常场景的 CLI 验收。
 
-本阶段实际完成：领域单元测试覆盖六类图形、move/scale、嵌套容器、唯一 id、父子环、顺序、属性白名单、浮点值和 SVG 序列化；通过 TypeScript 严格类型检查和生产构建验证。
+本阶段实际完成：领域单元测试覆盖六类图形、move/scale、嵌套容器、唯一 id、父子环、顺序、属性白名单、浮点值、SVG 序列化、已挂载树保护和 viewBox 封装；通过 TypeScript 严格类型检查和生产构建验证。
 阶段三追加应用层测试，覆盖十条命令、undo/redo、结构恢复、历史锁定、显示命令跳过历史和失败命令状态不变。
 阶段四追加 infrastructure 测试，覆盖实验样例、自动 id、重复 id、嵌套顺序、中文与 XML 转义、round-trip、未知类型、不支持标签和文件错误。
 阶段五追加 CLI 会话测试和真实管道回放，覆盖引号文本、注释、空行、完整编辑流程、错误前缀、失败状态不变、tree/show/help、退出命令和文档类操作。
 
-阶段六最终测试为 5 个测试文件、35 个测试通过；实际执行了 `npm.cmd test`、`npm.cmd run build`、`npm.cmd run typecheck` 和 `git diff --check`，均通过；另执行了 `npm.cmd run cli` 管道脚本回放，验证 Windows 临时路径、save/read、warning、tree 和 IO 后 undo。
+阶段六最终测试为 5 个测试文件、35 个测试通过；阶段八修复后为 5 个测试文件、40 个测试通过。实际执行了 `npm.cmd test`、`npm.cmd run build`、`npm.cmd run typecheck` 和 `git diff --check`，均通过；另执行了 `npm.cmd run cli` 管道脚本回放，验证 Windows 临时路径、save/read、warning、tree 和 IO 后 undo。
 
 阶段六先以验收矩阵和基线测试开始，新增 6 项验收测试。发现并修复了五类边界问题：`create in` 原先把缺失容器报告为 no such shape，修正为 no such container；`readFile` 原先把重复 id 等解析错误包装成 cannot read file，改为保留具体领域错误；Tokenizer 原先丢弃 Windows 路径中未知反斜杠，改为只解析定义的转义；文本内容为 `in` 原先被误判为尾缀子句，改为只识别倒数第二个 token 的 `in`；无文档 undo/redo 原先报告 nothing to undo，改为统一 no-document 错误。对应提交为 `b9f9838 test: complete SVG CLI acceptance`。
+
+阶段八根据最终架构审查先增加回归测试，再修复了审查发现的问题：已挂载 GroupShape 的直接结构修改现在被拒绝，避免绕过 SvgDocument id 索引；SvgDocument 的画布/viewBox 状态改为封装；Parser 不再把 Windows 路径中的普通反斜杠片段当作控制转义；help 补充完整 create 语法；text 内嵌不支持元素不再静默丢弃；测试脚本不再使用 `--passWithNoTests`。同时补充了 scale/ungroup redo、失败 read 保持原文档等测试。

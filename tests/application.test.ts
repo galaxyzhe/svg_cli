@@ -50,6 +50,8 @@ describe("basic editing commands", () => {
     expect(rect.getAttributes()).toMatchObject({ x: 22, y: 44, width: 6, height: 8 });
     invoker.undo();
     expect(rect.getAttributes()).toMatchObject({ x: 11, y: 22, width: 3, height: 4 });
+    invoker.redo();
+    expect(rect.getAttributes()).toMatchObject({ x: 22, y: 44, width: 6, height: 8 });
   });
 
   it("restores set values, including text and absent style attributes", () => {
@@ -149,6 +151,8 @@ describe("structure commands", () => {
     invoker.undo();
     expect(parent.getChildren().map((shape) => shape.id)).toEqual(["before", "group", "after"]);
     expect(group.getChildren().map((shape) => shape.id)).toEqual(["child"]);
+    invoker.redo();
+    expect(parent.getChildren().map((shape) => shape.id)).toEqual(["before", "child", "after"]);
   });
 
   it("supports addto, front and back with undo", () => {

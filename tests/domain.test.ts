@@ -83,10 +83,10 @@ describe("composite document structure", () => {
     document.addShape(rect, "first");
 
     expect(() => document.addShape(rect, "second")).toThrow("shape already has a parent: rect");
-    expect(() => first.addChild(first)).toThrow("cannot create cycle");
-    first.addChild(second);
-    expect(() => second.addChild(first)).toThrow("cannot create cycle");
-    expect(() => document.moveShape("first", "second")).toThrow("cannot create cycle");
+    const detached = new GroupShape("detached");
+    expect(() => detached.addChild(detached)).toThrow("cannot create cycle");
+    document.moveShape("first", "second");
+    expect(() => document.moveShape("second", "first")).toThrow("cannot create cycle");
   });
 
   it("preserves child order while changing parent", () => {
@@ -104,6 +104,17 @@ describe("composite document structure", () => {
     document.moveShape("first");
     expect(group.getChildren().map((shape) => shape.id)).toEqual(["second"]);
     expect(document.roots.map((shape) => shape.id)).toEqual(["group", "first"]);
+  });
+
+  it("protects the document index from direct mutation of an attached group", () => {
+    const document = new SvgDocument();
+    const group = new GroupShape("group");
+    document.addShape(group);
+    const child = new RectShape("child", 0, 0, 1, 1);
+
+    expect(() => group.addChild(child)).toThrow("document-managed");
+    expect(document.findShape("child")).toBeUndefined();
+    expect(group.getChildren()).toEqual([]);
   });
 });
 
@@ -135,6 +146,15 @@ describe("attributes and validation", () => {
     ellipse.move(0.1, 0.2);
     ellipse.scale(0.5);
     expect(ellipse.getAttributes()).toMatchObject({ cx: 0.675, cy: -1.15, rx: 0.375, ry: 2.25 });
+  });
+
+  it("does not expose mutable canvas viewBox state", () => {
+    const document = new SvgDocument(100, 80);
+    const externalViewBox = document.viewBox as { minX: number; minY: number; width: number; height: number };
+    externalViewBox.width = 999;
+
+    expect(document.viewBox.width).toBe(100);
+    expect(document.width).toBe(100);
   });
 
   it("serializes polymorphically and escapes text content", () => {

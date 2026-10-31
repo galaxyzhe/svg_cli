@@ -1,9 +1,11 @@
 import { DomainError } from "./DomainError.js";
 import { Shape, type ShapeAttributeValue } from "./Shape.js";
+import { documentTreeToken, ShapeTreeToken } from "./ShapeTreeToken.js";
 
 export class GroupShape extends Shape {
   public readonly type = "g";
   private readonly children: Shape[] = [];
+  private documentManaged = false;
 
   public override getChildren(): readonly Shape[] {
     return this.children;
@@ -39,26 +41,47 @@ export class GroupShape extends Shape {
   }
 
   public addChild(child: Shape): void {
-    if (child === this || child.contains(this)) {
-      throw new DomainError(`cannot create cycle involving: ${child.id}`);
-    }
-    if (child.parent !== null) {
-      throw new DomainError(`shape already has a parent: ${child.id}`);
-    }
-    this.children.push(child);
-    child.assignParent(this);
+    this.assertDetachedMutationAllowed();
+    this.addChildRaw(child);
+  }
+
+  public addChildAtManaged(child: Shape, index: number, token: ShapeTreeToken): void {
+    this.assertToken(token);
+    this.addChildRaw(child, index);
   }
 
   public removeChild(child: Shape): void {
-    const index = this.children.indexOf(child);
-    if (index < 0) {
-      throw new DomainError(`shape is not a child of: ${this.id}`);
-    }
-    this.children.splice(index, 1);
-    child.assignParent(null);
+    this.assertDetachedMutationAllowed();
+    this.removeChildRaw(child);
+  }
+
+  public removeChildManaged(child: Shape, token: ShapeTreeToken): void {
+    this.assertToken(token);
+    this.removeChildRaw(child);
   }
 
   public insertChildAt(child: Shape, index: number): void {
+    this.assertDetachedMutationAllowed();
+    this.addChildRaw(child, index);
+  }
+
+  public markDocumentManaged(token: ShapeTreeToken): void {
+    this.assertToken(token);
+    this.documentManaged = true;
+    for (const child of this.children) {
+      if (child instanceof GroupShape) child.markDocumentManaged(token);
+    }
+  }
+
+  public markDocumentDetached(token: ShapeTreeToken): void {
+    this.assertToken(token);
+    this.documentManaged = false;
+    for (const child of this.children) {
+      if (child instanceof GroupShape) child.markDocumentDetached(token);
+    }
+  }
+
+  private addChildRaw(child: Shape, index = this.children.length): void {
     if (index < 0 || index > this.children.length) {
       throw new DomainError(`child index out of range: ${index}`);
     }
@@ -69,7 +92,24 @@ export class GroupShape extends Shape {
       throw new DomainError(`shape already has a parent: ${child.id}`);
     }
     this.children.splice(index, 0, child);
-    child.assignParent(this);
+    child.assignParent(this, documentTreeToken);
+  }
+
+  private removeChildRaw(child: Shape): void {
+    const index = this.children.indexOf(child);
+    if (index < 0) {
+      throw new DomainError(`shape is not a child of: ${this.id}`);
+    }
+    this.children.splice(index, 1);
+    child.assignParent(null, documentTreeToken);
+  }
+
+  private assertDetachedMutationAllowed(): void {
+    if (this.documentManaged) throw new DomainError("shape is document-managed; use SvgDocument");
+  }
+
+  private assertToken(token: ShapeTreeToken): void {
+    if (token !== documentTreeToken) throw new DomainError("invalid shape tree token");
   }
 
   public getChildIndex(child: Shape): number {

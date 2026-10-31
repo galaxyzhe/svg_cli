@@ -24,6 +24,16 @@ describe("phase acceptance: documents and canvas", () => {
     expect((await execute(session, "save"))[0]).toBe(`saved to ${source} (7 elements)`);
   });
 
+  it("keeps the current document when read fails", async () => {
+    const session = new CliSession();
+    await execute(session, "init 123 456");
+
+    expect(await execute(session, "read tests/fixtures/missing.svg")).toEqual([
+      "error: cannot read file: tests/fixtures/missing.svg",
+    ]);
+    expect((await execute(session, "canvas"))[0]).toBe("canvas 123x456");
+  });
+
   it("locks history after document operations and canvas changes", async () => {
     const directory = await mkdtemp(join(tmpdir(), "svg-cli-"));
     const output = join(directory, "canvas.svg");

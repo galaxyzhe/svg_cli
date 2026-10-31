@@ -17,8 +17,7 @@ export class CommandLineParser {
     let tokenStarted = false;
     for (const character of source) {
       if (escaping) {
-        token += character === "n" ? "\n" : character === "t" ? "\t" : character === "r" ? "\r" :
-          character === '"' || character === "\\" ? character : `\\${character}`;
+        token += character === '"' || character === "\\" ? character : `\\${character}`;
         escaping = false;
         tokenStarted = true;
       } else if (character === "\\") {

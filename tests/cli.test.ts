@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { CliSession } from "../src/cli/CliSession.js";
+import { CommandLineParser } from "../src/cli/CommandLineParser.js";
 
 async function run(session: CliSession, line: string): Promise<readonly string[]> {
   return session.executeLine(line);
 }
 
 describe("CLI session", () => {
+  it("preserves Windows path backslashes that are not explicit escapes", () => {
+    const parsed = new CommandLineParser().parse('read "C:\\new\\file.svg"');
+    expect(parsed?.arguments).toEqual(["C:\\new\\file.svg"]);
+  });
+
   it("replays the core editing workflow with quoted text and composite operations", async () => {
     const session = new CliSession();
     expect(await run(session, "")).toEqual([]);
@@ -58,5 +64,6 @@ describe("CLI session", () => {
     expect(await run(session, "canvas")).toEqual(["canvas 800x600"]);
     expect(await run(session, "canvas 400 300")).toEqual(["canvas 400x300 updated"]);
     expect((await run(session, "help"))[0]).toContain("exit / quit");
+    expect((await run(session, "help"))[0]).toContain("create rect <id> <x> <y> <w> <h> [fill]");
   });
 });

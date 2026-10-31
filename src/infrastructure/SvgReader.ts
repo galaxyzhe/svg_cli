@@ -71,6 +71,7 @@ export class SvgReader {
     const attributes = this.shapeAttributes(element.attributes);
     const text = this.textContent(element.children);
     const shape = this.factory.create(element.name, id, attributes, text);
+    if (!(shape instanceof GroupShape)) this.rejectNestedElements(element.children);
     document.addShapeAt(shape, parent, parent === null ? document.roots.length : parent.getChildren().length);
     if (shape instanceof GroupShape) {
       for (const child of element.children) {
@@ -135,6 +136,13 @@ export class SvgReader {
       .filter((child) => typeof child["#text"] === "string")
       .map((child) => child["#text"] as string)
       .join("");
+  }
+
+  private rejectNestedElements(children: readonly unknown[]): void {
+    for (const child of children) {
+      const element = this.toElement(child);
+      if (element !== null) throw new DomainError(`unknown shape type: ${element.name}`);
+    }
   }
 
   private readViewBox(value: string | undefined): SvgViewBox | undefined {

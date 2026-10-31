@@ -1,6 +1,7 @@
 import { DomainError } from "./DomainError.js";
 import { GroupShape } from "./GroupShape.js";
 import { Shape } from "./Shape.js";
+import { documentTreeToken } from "./ShapeTreeToken.js";
 
 export interface SvgViewBox {
   readonly minX: number;
@@ -12,15 +13,33 @@ export interface SvgViewBox {
 export class SvgDocument {
   private readonly rootShapes: Shape[] = [];
   private readonly shapesById = new Map<string, Shape>();
+  private canvasWidth: number;
+  private canvasHeight: number;
+  private currentViewBox: SvgViewBox;
 
   public constructor(
-    public width = 800,
-    public height = 600,
-    public viewBox: SvgViewBox = { minX: 0, minY: 0, width, height },
+    width = 800,
+    height = 600,
+    viewBox: SvgViewBox = { minX: 0, minY: 0, width, height },
   ) {
     this.validateCanvasDimension(width, "width");
     this.validateCanvasDimension(height, "height");
     this.validateViewBox(viewBox);
+    this.canvasWidth = width;
+    this.canvasHeight = height;
+    this.currentViewBox = { ...viewBox };
+  }
+
+  public get width(): number {
+    return this.canvasWidth;
+  }
+
+  public get height(): number {
+    return this.canvasHeight;
+  }
+
+  public get viewBox(): SvgViewBox {
+    return { ...this.currentViewBox };
   }
 
   public get roots(): readonly Shape[] {
@@ -65,7 +84,8 @@ export class SvgDocument {
     }
 
     if (parent === null) this.rootShapes.splice(index, 0, shape);
-    else parent.insertChildAt(shape, index);
+    else parent.addChildAtManaged(shape, index, documentTreeToken);
+    this.markTreeManaged(shape);
     for (const node of nodes) this.shapesById.set(node.id, node);
   }
 
@@ -75,9 +95,10 @@ export class SvgDocument {
       const index = this.rootShapes.indexOf(shape);
       this.rootShapes.splice(index, 1);
     } else {
-      shape.parent.removeChild(shape);
+      shape.parent.removeChildManaged(shape, documentTreeToken);
     }
     for (const node of this.collectNodes(shape)) this.shapesById.delete(node.id);
+    this.markTreeDetached(shape);
     return shape;
   }
 
@@ -106,7 +127,7 @@ export class SvgDocument {
 
     this.detachShape(shape);
     if (destination === null) this.rootShapes.splice(index, 0, shape);
-    else destination.insertChildAt(shape, index);
+    else destination.addChildAtManaged(shape, index, documentTreeToken);
   }
 
   public getShapeIndex(shape: Shape): number {
@@ -123,14 +144,14 @@ export class SvgDocument {
     this.detachShape(group);
     for (const node of this.collectNodes(group)) this.shapesById.delete(node.id);
     for (const child of children) {
-      group.removeChild(child);
+      group.removeChildManaged(child, documentTreeToken);
       this.insertShapeAt(child, parent, index + children.indexOf(child));
     }
     return children;
   }
 
   private insertShapeAt(shape: Shape, parent: GroupShape, index: number): void {
-    parent.insertChildAt(shape, index);
+    parent.addChildAtManaged(shape, index, documentTreeToken);
     for (const node of this.collectNodes(shape)) this.shapesById.set(node.id, node);
   }
 
@@ -140,7 +161,7 @@ export class SvgDocument {
       if (index < 0) throw new DomainError(`no such shape: ${shape.id}`);
       this.rootShapes.splice(index, 1);
     } else {
-      shape.parent.removeChild(shape);
+      shape.parent.removeChildManaged(shape, documentTreeToken);
     }
   }
 
@@ -157,14 +178,22 @@ export class SvgDocument {
   public setCanvasSize(width: number, height: number): void {
     this.validateCanvasDimension(width, "width");
     this.validateCanvasDimension(height, "height");
-    this.width = width;
-    this.height = height;
-    this.viewBox = { minX: this.viewBox.minX, minY: this.viewBox.minY, width, height };
+    this.canvasWidth = width;
+    this.canvasHeight = height;
+    this.currentViewBox = { minX: this.currentViewBox.minX, minY: this.currentViewBox.minY, width, height };
   }
 
   public setViewBox(viewBox: SvgViewBox): void {
     this.validateViewBox(viewBox);
-    this.viewBox = { ...viewBox };
+    this.currentViewBox = { ...viewBox };
+  }
+
+  private markTreeManaged(shape: Shape): void {
+    if (shape instanceof GroupShape) shape.markDocumentManaged(documentTreeToken);
+  }
+
+  private markTreeDetached(shape: Shape): void {
+    if (shape instanceof GroupShape) shape.markDocumentDetached(documentTreeToken);
   }
 
   private collectNodes(shape: Shape): Shape[] {

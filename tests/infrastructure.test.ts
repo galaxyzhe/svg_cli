@@ -48,6 +48,12 @@ describe("SvgReader", () => {
       .toThrow("unknown shape type: path");
     expect(warnings).toEqual([]);
   });
+
+  it("does not silently discard nested unsupported XML elements", () => {
+    const reader = new SvgReader(undefined, () => undefined);
+    expect(() => reader.read('<svg width="10" height="10"><text id="t" x="0" y="0"><tspan>text</tspan></text></svg>'))
+      .toThrow("unknown shape type: tspan");
+  });
 });
 
 describe("SvgWriter round-trip", () => {
