@@ -26,9 +26,18 @@ export class SvgDocument {
   }
 
   public addShape(shape: Shape, parentId?: string): void {
+    const parent = parentId === undefined ? null : this.getShape(parentId);
+    if (parent !== null && !(parent instanceof GroupShape)) {
+      throw new DomainError(`not a container: ${parentId}`);
+    }
+    this.addShapeAt(shape, parent, parent === null ? this.rootShapes.length : parent.getChildren().length);
+  }
+
+  public addShapeAt(shape: Shape, parent: GroupShape | null, index: number): void {
     if (shape.parent !== null) {
       throw new DomainError(`shape already has a parent: ${shape.id}`);
     }
+    this.validateParent(parent);
     const nodes = this.collectNodes(shape);
     const localIds = new Set<string>();
     for (const node of nodes) {
@@ -38,13 +47,13 @@ export class SvgDocument {
       localIds.add(node.id);
     }
 
-    const parent = parentId === undefined ? null : this.getShape(parentId);
-    if (parent !== null && !(parent instanceof GroupShape)) {
-      throw new DomainError(`not a container: ${parentId}`);
+    const childCount = parent === null ? this.rootShapes.length : parent.getChildren().length;
+    if (index < 0 || index > childCount) {
+      throw new DomainError(`shape index out of range: ${index}`);
     }
 
-    if (parent === null) this.rootShapes.push(shape);
-    else parent.addChild(shape);
+    if (parent === null) this.rootShapes.splice(index, 0, shape);
+    else parent.insertChildAt(shape, index);
     for (const node of nodes) this.shapesById.set(node.id, node);
   }
 
@@ -66,22 +75,70 @@ export class SvgDocument {
     if (destination !== null && !(destination instanceof GroupShape)) {
       throw new DomainError(`not a container: ${parentId}`);
     }
+    this.moveShapeAt(shape, destination, destination === null ? this.rootShapes.length : destination.getChildren().length);
+  }
+
+  public moveShapeAt(shape: Shape, destination: GroupShape | null, index: number): void {
+    this.validateRegistered(shape);
+    this.validateParent(destination);
     if (destination === shape || (destination !== null && shape.contains(destination))) {
       throw new DomainError(`cannot create cycle involving: ${shape.id}`);
     }
-    if (shape.parent === destination) return;
-
-    const originalParent = shape.parent;
-    if (originalParent === null) {
-      this.rootShapes.splice(this.rootShapes.indexOf(shape), 1);
-    } else {
-      originalParent.removeChild(shape);
+    const source = shape.parent;
+    const destinationCount = destination === null ? this.rootShapes.length : destination.getChildren().length;
+    const finalDestinationCount = source === destination ? destinationCount - 1 : destinationCount;
+    if (index < 0 || index > finalDestinationCount) {
+      throw new DomainError(`shape index out of range: ${index}`);
     }
+    if (source === destination && this.getShapeIndex(shape) === index) return;
 
-    if (destination === null) {
-      this.rootShapes.push(shape);
+    this.detachShape(shape);
+    if (destination === null) this.rootShapes.splice(index, 0, shape);
+    else destination.insertChildAt(shape, index);
+  }
+
+  public getShapeIndex(shape: Shape): number {
+    this.validateRegistered(shape);
+    return shape.parent === null ? this.rootShapes.indexOf(shape) : shape.parent.getChildIndex(shape);
+  }
+
+  public ungroupShape(group: GroupShape): readonly Shape[] {
+    this.validateRegistered(group);
+    const parent = group.parent;
+    if (parent === null) throw new DomainError(`cannot ungroup top-level container: ${group.id}`);
+    const index = this.getShapeIndex(group);
+    const children = [...group.getChildren()];
+    this.detachShape(group);
+    for (const node of this.collectNodes(group)) this.shapesById.delete(node.id);
+    for (const child of children) {
+      group.removeChild(child);
+      this.insertShapeAt(child, parent, index + children.indexOf(child));
+    }
+    return children;
+  }
+
+  private insertShapeAt(shape: Shape, parent: GroupShape, index: number): void {
+    parent.insertChildAt(shape, index);
+    for (const node of this.collectNodes(shape)) this.shapesById.set(node.id, node);
+  }
+
+  private detachShape(shape: Shape): void {
+    if (shape.parent === null) {
+      const index = this.rootShapes.indexOf(shape);
+      if (index < 0) throw new DomainError(`no such shape: ${shape.id}`);
+      this.rootShapes.splice(index, 1);
     } else {
-      destination.addChild(shape);
+      shape.parent.removeChild(shape);
+    }
+  }
+
+  private validateParent(parent: GroupShape | null): void {
+    if (parent !== null) this.validateRegistered(parent);
+  }
+
+  private validateRegistered(shape: Shape): void {
+    if (this.shapesById.get(shape.id) !== shape) {
+      throw new DomainError(`no such shape: ${shape.id}`);
     }
   }
 

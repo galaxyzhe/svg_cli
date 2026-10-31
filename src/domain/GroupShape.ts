@@ -71,4 +71,8 @@ export class GroupShape extends Shape {
     this.children.splice(index, 0, child);
     child.assignParent(this);
   }
+
+  public getChildIndex(child: Shape): number {
+    return this.children.indexOf(child);
+  }
 }

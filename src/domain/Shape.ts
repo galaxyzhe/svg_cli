@@ -29,6 +29,17 @@ export abstract class Shape {
 
   public abstract toSvg(): string;
 
+  public getAttribute(attribute: string): ShapeAttributeValue | undefined {
+    return this.getAttributes()[attribute];
+  }
+
+  public removeAttribute(attribute: string): void {
+    if (attribute !== "fill" && attribute !== "stroke" && attribute !== "stroke-width") {
+      throw new DomainError(`cannot remove attribute: ${attribute}`);
+    }
+    this.styleAttributes.delete(attribute);
+  }
+
   public getChildren(): readonly Shape[] {
     return [];
   }
